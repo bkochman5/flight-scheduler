@@ -25,6 +25,11 @@ if ($path === '/health') {
     exit;
 }
 
+if ($path === '/version') {
+    echo json_encode(['version' => '1.0.0']);
+    exit;
+}
+
 if ($path === '/flights') {
     echo json_encode($flights);
     exit;
