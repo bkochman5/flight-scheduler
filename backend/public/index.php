@@ -18,6 +18,30 @@ $flights = [
     ],
 ];
 
+$stateFile = __DIR__ . '/../data/state.json';
+
+function loadState(string $filePath): array {
+    if (!file_exists($filePath)) {
+        return [];
+    }
+    $json = file_get_contents($filePath);
+    $data = json_decode($json, true);
+    return is_array($data) ? $data : [];
+}
+
+function saveState(string $filePath, array $state): void {
+    file_put_contents($filePath, json_encode($state, JSON_PRETTY_PRINT));
+}
+
+
+// $flightState = [
+//     'flightNumber' => 101,
+//     'economySeats' => 2,
+//     'booked' => [],
+//     'waitlist' => [],
+// ];
+
+
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
 if ($path === '/' || $path === '') {
@@ -48,7 +72,7 @@ if (preg_match('#^/flights/(\d+)$#', $path, $matches)) {
 
         }
     }
-    
+
     http_response_code(404);
     echo json_encode([
         'error' => 'Flight not found',
@@ -62,6 +86,57 @@ if ($path === '/flights') {
     echo json_encode($flights);
     exit;
 }
+
+if ($path === '/flights/101/book' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $passengerName = $_POST['name'] ?? null;
+
+    if (!$passengerName) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Passenger name required']);
+        exit;
+    }
+
+    $state = loadState($stateFile);
+
+    if (!isset($state['101'])) {
+        $state['101'] = [
+            'economySeats' => 2,
+            'booked' => [],
+            'waitlist' => [],
+        ];
+    }
+
+    // Prevent duplicates 
+    if (in_array($passengerName, $state['101']['booked'], true) || in_array($passengerName, $state['101']['waitlist'], true)) {
+        http_response_code(409);
+        echo json_encode(['error' => 'Passenger already exists in booking or waitlist']);
+        exit;
+    }
+
+    if (count($state['101']['booked']) < $state['101']['economySeats']) {
+        $state['101']['booked'][] = $passengerName;
+        saveState($stateFile, $state);
+
+        echo json_encode([
+            'status' => 'booked',
+            'passenger' => $passengerName,
+            'seatNumber' => count($state['101']['booked']),
+        ]);
+        exit;
+    }
+
+    $state['101']['waitlist'][] = $passengerName;
+    saveState($stateFile, $state);
+
+    echo json_encode([
+        'status' => 'waitlisted',
+        'passenger' => $passengerName,
+        'position' => count($state['101']['waitlist']),
+    ]);
+    exit;
+}
+
+
 
 http_response_code(404);
 echo json_encode([

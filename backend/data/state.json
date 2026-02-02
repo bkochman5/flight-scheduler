@@ -1,0 +1,13 @@
+{
+    "101": {
+        "economySeats": 2,
+        "booked": [
+            "Alice",
+            "Bob"
+        ],
+        "waitlist": [
+            "Charlie",
+            "David"
+        ]
+    }
+}
