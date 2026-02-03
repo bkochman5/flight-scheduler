@@ -201,6 +201,57 @@ if ($path === '/flights/101/cancel' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
+if ($path === '/passengers/status' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    $name = $_GET['name'] ?? null;
+
+    if (!$name) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Query param "name" is required']);
+        exit;
+    }
+
+    $state = loadState($stateFile);
+
+    if (!isset($state['101'])) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Flight state not found']);
+        exit;
+    }
+
+    $booked = $state['101']['booked'];
+    $waitlist = $state['101']['waitlist'];
+
+    $bookedIndex = array_search($name, $booked, true);
+    if ($bookedIndex !== false) {
+        echo json_encode([
+            'name' => $name,
+            'status' => 'booked',
+            'flightNumber' => 101,
+            'seatNumber' => $bookedIndex + 1,
+        ]);
+        exit;
+    }
+
+    $waitIndex = array_search($name, $waitlist, true);
+    if ($waitIndex !== false) {
+        echo json_encode([
+            'name' => $name,
+            'status' => 'waitlisted',
+            'flightNumber' => 101,
+            'position' => $waitIndex + 1,
+        ]);
+        exit;
+    }
+
+    http_response_code(404);
+    echo json_encode([
+        'name' => $name,
+        'status' => 'not_found',
+        'message' => 'Passenger not found in booking or waitlist',
+    ]);
+    exit;
+}
+
 
 http_response_code(404);
 echo json_encode([
