@@ -252,6 +252,61 @@ if ($path === '/passengers/status' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     exit;
 }
 
+if ($path === '/flights/101/info' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    $state = loadState($stateFile);
+
+    if (!isset($state['101'])) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Flight state not found']);
+        exit;
+    }
+
+    // Find flight metadata (from hardcoded $flights)
+    $flightMeta = null;
+    foreach ($flights as $f) {
+        if ($f['flightNumber'] === 101) {
+            $flightMeta = $f;
+            break;
+        }
+    }
+
+    if ($flightMeta === null) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Flight not found in flights list', 'flightNumber' => 101]);
+        exit;
+    }
+
+    $economySeats = (int) $state['101']['economySeats'];
+    $booked = $state['101']['booked'];
+    $waitlist = $state['101']['waitlist'];
+
+    // Build seat map 1..N
+    $seats = [];
+    for ($i = 1; $i <= $economySeats; $i++) {
+        $passenger = $booked[$i - 1] ?? null;
+        $seats[] = [
+            'seatNumber' => $i,
+            'class' => 'economy',
+            'passenger' => $passenger,
+        ];
+    }
+
+    echo json_encode([
+        'flight' => [
+            'flightNumber' => $flightMeta['flightNumber'],
+            'departureAirport' => $flightMeta['departureAirport'],
+            'departureDate' => $flightMeta['departureDate'],
+            'arrivalAirport' => $flightMeta['arrivalAirport'],
+        ],
+        'seats' => $seats,
+        'waitlist' => [
+            'class' => 'economy',
+            'names' => $waitlist,
+        ],
+    ]);
+    exit;
+}
+
 
 http_response_code(404);
 echo json_encode([
