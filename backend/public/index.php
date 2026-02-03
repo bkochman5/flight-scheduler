@@ -136,6 +136,70 @@ if ($path === '/flights/101/book' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
+if ($path === '/flights/101/state' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    $state = loadState($stateFile);
+
+    echo json_encode([
+        'flightNumber' => 101,
+        'state' => $state['101'] ?? null,
+    ]);
+    exit;
+}
+
+if ($path === '/flights/101/cancel' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $passengerName = $_POST['name'] ?? null;
+
+    if (!$passengerName) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Passenger name required']);
+        exit;
+    }
+
+    $state = loadState($stateFile);
+
+    if (!isset($state['101'])) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Flight state not found']);
+        exit;
+    }
+
+    $booked = $state['101']['booked'];
+    $waitlist = $state['101']['waitlist'];
+
+    // Find passenger in booked
+    $index = array_search($passengerName, $booked, true);
+
+    if ($index === false) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Passenger not found in booked list']);
+        exit;
+    }
+
+    // Remove passenger from booked
+    array_splice($booked, $index, 1);
+
+    $movedFromWaitlist = null;
+
+    // Auto-move next passenger from waitlist if someone is waiting
+    if (count($waitlist) > 0) {
+        $movedFromWaitlist = array_shift($waitlist); // FIFO
+        $booked[] = $movedFromWaitlist;
+    }
+
+    // Save back
+    $state['101']['booked'] = $booked;
+    $state['101']['waitlist'] = $waitlist;
+    saveState($stateFile, $state);
+
+    echo json_encode([
+        'status' => 'cancelled',
+        'cancelledPassenger' => $passengerName,
+        'movedFromWaitlist' => $movedFromWaitlist,
+        'booked' => $booked,
+        'waitlist' => $waitlist,
+    ]);
+    exit;
+}
 
 
 http_response_code(404);

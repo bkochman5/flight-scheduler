@@ -2,11 +2,10 @@
     "101": {
         "economySeats": 2,
         "booked": [
-            "Alice",
-            "Bob"
+            "Bob",
+            "Charlie"
         ],
         "waitlist": [
-            "Charlie",
             "David"
         ]
     }
