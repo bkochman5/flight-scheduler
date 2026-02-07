@@ -33,6 +33,9 @@ function saveState(string $filePath, array $state): void {
     file_put_contents($filePath, json_encode($state, JSON_PRETTY_PRINT));
 }
 
+function isValidClass(string $class): bool {
+    return in_array($class, ['first', 'business', 'economy'], true);
+}
 
 // $flightState = [
 //     'flightNumber' => 101,
@@ -89,52 +92,76 @@ if ($path === '/flights') {
 
 if ($path === '/flights/101/book' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $passengerName = $_POST['name'] ?? null;
+    $class = $_POST['class'] ?? 'economy';
 
     if (!$passengerName) {
         http_response_code(400);
         echo json_encode(['error' => 'Passenger name required']);
         exit;
     }
-
-    $state = loadState($stateFile);
-
-    if (!isset($state['101'])) {
-        $state['101'] = [
-            'economySeats' => 2,
-            'booked' => [],
-            'waitlist' => [],
-        ];
-    }
-
-    // Prevent duplicates 
-    if (in_array($passengerName, $state['101']['booked'], true) || in_array($passengerName, $state['101']['waitlist'], true)) {
-        http_response_code(409);
-        echo json_encode(['error' => 'Passenger already exists in booking or waitlist']);
+    if (!isValidClass($class)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid class', 'allowed' => ['first','business','economy']]);
         exit;
     }
 
-    if (count($state['101']['booked']) < $state['101']['economySeats']) {
-        $state['101']['booked'][] = $passengerName;
+    $state = loadState($stateFile);
+
+    if (!isset($state['101']['classes'][$class])) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Class not found in state', 'class' => $class]);
+        exit;
+    }
+
+    $classState = $state['101']['classes'][$class];
+    $seats = $classState['seats'];
+    $booked = $classState['booked'];
+    $waitlist = $classState['waitlist'];
+
+    // Prevent duplicates across this class
+    if (in_array($passengerName, array_values($booked), true) || in_array($passengerName, $waitlist, true)) {
+        http_response_code(409);
+        echo json_encode(['error' => 'Passenger already exists in this class']);
+        exit;
+    }
+
+    // Find first free seat
+    $assignedSeat = null;
+    foreach ($seats as $seatNumber) {
+        if (!isset($booked[(string)$seatNumber])) {
+            $assignedSeat = $seatNumber;
+            break;
+        }
+    }
+
+    if ($assignedSeat !== null) {
+        $booked[(string)$assignedSeat] = $passengerName;
+        $state['101']['classes'][$class]['booked'] = $booked;
         saveState($stateFile, $state);
 
         echo json_encode([
             'status' => 'booked',
+            'class' => $class,
             'passenger' => $passengerName,
-            'seatNumber' => count($state['101']['booked']),
+            'seatNumber' => $assignedSeat,
         ]);
         exit;
     }
 
-    $state['101']['waitlist'][] = $passengerName;
+    // No free seats -> waitlist
+    $waitlist[] = $passengerName;
+    $state['101']['classes'][$class]['waitlist'] = $waitlist;
     saveState($stateFile, $state);
 
     echo json_encode([
         'status' => 'waitlisted',
+        'class' => $class,
         'passenger' => $passengerName,
-        'position' => count($state['101']['waitlist']),
+        'position' => count($waitlist),
     ]);
     exit;
 }
+
 
 if ($path === '/flights/101/state' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     $state = loadState($stateFile);
@@ -148,58 +175,71 @@ if ($path === '/flights/101/state' && $_SERVER['REQUEST_METHOD'] === 'GET') {
 
 if ($path === '/flights/101/cancel' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $passengerName = $_POST['name'] ?? null;
+    $class = $_POST['class'] ?? 'economy';
 
     if (!$passengerName) {
         http_response_code(400);
         echo json_encode(['error' => 'Passenger name required']);
         exit;
     }
+    if (!isValidClass($class)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid class', 'allowed' => ['first','business','economy']]);
+        exit;
+    }
 
     $state = loadState($stateFile);
 
-    if (!isset($state['101'])) {
+    if (!isset($state['101']['classes'][$class])) {
         http_response_code(404);
-        echo json_encode(['error' => 'Flight state not found']);
+        echo json_encode(['error' => 'Class not found in state', 'class' => $class]);
         exit;
     }
 
-    $booked = $state['101']['booked'];
-    $waitlist = $state['101']['waitlist'];
+    $classState = $state['101']['classes'][$class];
+    $seats = $classState['seats'];
+    $booked = $classState['booked'];
+    $waitlist = $classState['waitlist'];
 
-    // Find passenger in booked
-    $index = array_search($passengerName, $booked, true);
+    // Find which seat the passenger occupies
+    $seatToFree = null;
+    foreach ($booked as $seatNumberStr => $name) {
+        if ($name === $passengerName) {
+            $seatToFree = (int)$seatNumberStr;
+            break;
+        }
+    }
 
-    if ($index === false) {
+    if ($seatToFree === null) {
         http_response_code(404);
-        echo json_encode(['error' => 'Passenger not found in booked list']);
+        echo json_encode(['error' => 'Passenger not found in booked list', 'class' => $class]);
         exit;
     }
 
-    // Remove passenger from booked
-    array_splice($booked, $index, 1);
+    unset($booked[(string)$seatToFree]);
 
     $movedFromWaitlist = null;
 
-    // Auto-move next passenger from waitlist if someone is waiting
+    // Auto-move FIFO: assign next waiting passenger to the freed seat
     if (count($waitlist) > 0) {
-        $movedFromWaitlist = array_shift($waitlist); // FIFO
-        $booked[] = $movedFromWaitlist;
+        $movedFromWaitlist = array_shift($waitlist);
+        $booked[(string)$seatToFree] = $movedFromWaitlist;
     }
 
-    // Save back
-    $state['101']['booked'] = $booked;
-    $state['101']['waitlist'] = $waitlist;
+    $state['101']['classes'][$class]['booked'] = $booked;
+    $state['101']['classes'][$class]['waitlist'] = $waitlist;
     saveState($stateFile, $state);
 
     echo json_encode([
         'status' => 'cancelled',
+        'class' => $class,
         'cancelledPassenger' => $passengerName,
+        'freedSeat' => $seatToFree,
         'movedFromWaitlist' => $movedFromWaitlist,
-        'booked' => $booked,
-        'waitlist' => $waitlist,
     ]);
     exit;
 }
+
 
 if ($path === '/passengers/status' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     $name = $_GET['name'] ?? null;
@@ -255,41 +295,38 @@ if ($path === '/passengers/status' && $_SERVER['REQUEST_METHOD'] === 'GET') {
 if ($path === '/flights/101/info' && $_SERVER['REQUEST_METHOD'] === 'GET') {
     $state = loadState($stateFile);
 
-    if (!isset($state['101'])) {
-        http_response_code(404);
-        echo json_encode(['error' => 'Flight state not found']);
-        exit;
-    }
-
-    // Find flight metadata (from hardcoded $flights)
     $flightMeta = null;
     foreach ($flights as $f) {
-        if ($f['flightNumber'] === 101) {
-            $flightMeta = $f;
-            break;
-        }
+        if ($f['flightNumber'] === 101) { $flightMeta = $f; break; }
     }
-
-    if ($flightMeta === null) {
+    if ($flightMeta === null || !isset($state['101']['classes'])) {
         http_response_code(404);
-        echo json_encode(['error' => 'Flight not found in flights list', 'flightNumber' => 101]);
+        echo json_encode(['error' => 'Flight not found or state missing']);
         exit;
     }
 
-    $economySeats = (int) $state['101']['economySeats'];
-    $booked = $state['101']['booked'];
-    $waitlist = $state['101']['waitlist'];
+    $classesOut = [];
 
-    // Build seat map 1..N
-    $seats = [];
-    for ($i = 1; $i <= $economySeats; $i++) {
-        $passenger = $booked[$i - 1] ?? null;
-        $seats[] = [
-            'seatNumber' => $i,
-            'class' => 'economy',
-            'passenger' => $passenger,
+    foreach (['first','business','economy'] as $class) {
+        $classState = $state['101']['classes'][$class];
+        $seats = $classState['seats'];
+        $booked = $classState['booked'];
+        $waitlist = $classState['waitlist'];
+
+        $seatMap = [];
+        foreach ($seats as $seatNumber) {
+            $seatMap[] = [
+                'seatNumber' => $seatNumber,
+                'class' => $class,
+                'passenger' => $booked[(string)$seatNumber] ?? null,
+            ];
+        }
+
+        $classesOut[$class] = [
+            'seats' => $seatMap,
+            'waitlist' => $waitlist,
         ];
-}
+    }
 
     echo json_encode([
         'flight' => [
@@ -298,14 +335,11 @@ if ($path === '/flights/101/info' && $_SERVER['REQUEST_METHOD'] === 'GET') {
             'departureDate' => $flightMeta['departureDate'],
             'arrivalAirport' => $flightMeta['arrivalAirport'],
         ],
-        'seats' => $seats,
-        'waitlist' => [
-            'class' => 'economy',
-            'names' => $waitlist,
-        ],
+        'classes' => $classesOut,
     ]);
     exit;
 }
+
 
 
 http_response_code(404);
