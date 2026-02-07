@@ -33,6 +33,61 @@ function saveState(string $filePath, array $state): void {
     file_put_contents($filePath, json_encode($state, JSON_PRETTY_PRINT));
 }
 
+function mergeSortFlights(array $flights, string $by): array {
+    $n = count($flights);
+    if ($n <= 1) return $flights;
+
+    $mid = intdiv($n, 2);
+    $left = array_slice($flights, 0, $mid);
+    $right = array_slice($flights, $mid);
+
+    $leftSorted = mergeSortFlights($left, $by);
+    $rightSorted = mergeSortFlights($right, $by);
+
+    return mergeFlights($leftSorted, $rightSorted, $by);
+}
+
+function mergeFlights(array $left, array $right, string $by): array {
+    $result = [];
+    $i = 0;
+    $j = 0;
+
+    while ($i < count($left) && $j < count($right)) {
+        $a = $left[$i][$by];
+        $b = $right[$j][$by];
+
+        if ($a <= $b) {
+            $result[] = $left[$i];
+            $i++;
+        } else {
+            $result[] = $right[$j];
+            $j++;
+        }
+    }
+
+    while ($i < count($left)) { $result[] = $left[$i]; $i++; }
+    while ($j < count($right)) { $result[] = $right[$j]; $j++; }
+
+    return $result;
+}
+
+function binarySearchFlightByNumber(array $sortedFlights, int $target): ?array {
+    $low = 0;
+    $high = count($sortedFlights) - 1;
+
+    while ($low <= $high) {
+        $mid = intdiv($low + $high, 2);
+        $midVal = (int)$sortedFlights[$mid]['flightNumber'];
+
+        if ($midVal === $target) return $sortedFlights[$mid];
+        if ($midVal < $target) $low = $mid + 1;
+        else $high = $mid - 1;
+    }
+
+    return null;
+}
+
+
 function isValidClass(string $class): bool {
     return in_array($class, ['first', 'business', 'economy'], true);
 }
@@ -346,6 +401,49 @@ if ($path === '/flights/101/info' && $_SERVER['REQUEST_METHOD'] === 'GET') {
         ],
         'classes' => $classesOut,
     ]);
+    exit;
+}
+
+if ($path === '/flights/sorted' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    $by = $_GET['by'] ?? 'flightNumber';
+
+    if (!in_array($by, ['flightNumber', 'departureDate'], true)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Invalid "by" parameter', 'allowed' => ['flightNumber','departureDate']]);
+        exit;
+    }
+
+    $sorted = mergeSortFlights($flights, $by);
+    echo json_encode([
+        'sortedBy' => $by,
+        'flights' => $sorted
+    ]);
+    exit;
+}
+
+
+if ($path === '/flights/search' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    $flightNumberStr = $_GET['flightNumber'] ?? null;
+
+    if ($flightNumberStr === null || $flightNumberStr === '') {
+        http_response_code(400);
+        echo json_encode(['error' => 'Query param "flightNumber" is required']);
+        exit;
+    }
+
+    $target = (int)$flightNumberStr;
+
+    
+    $sorted = mergeSortFlights($flights, 'flightNumber');
+    $found = binarySearchFlightByNumber($sorted, $target);
+
+    if ($found === null) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Flight not found', 'flightNumber' => $target]);
+        exit;
+    }
+
+    echo json_encode(['flight' => $found]);
     exit;
 }
 
