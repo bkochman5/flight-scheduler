@@ -27,15 +27,17 @@ The application demonstrates backend business logic, REST APIs, and a React + Ty
 
 ## Project Structure
 
+```text
 flight_scheduler/
 ├── backend/
-│ ├── public/
-│ │ └── index.php
-│ └── data/
-│ └── state.json
+│   ├── public/
+│   │   └── index.php
+│   └── data/
+│       └── state.json
 ├── frontend/
-│ └── src/
-│ └── App.tsx
+│   └── src/
+│       └── App.tsx
 └── README.md
+
 
 The backend uses file-based storage instead of a database to keep the logic simple and explicit.
