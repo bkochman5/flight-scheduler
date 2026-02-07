@@ -123,19 +123,25 @@ function renderClass(className: string, classData: any) {
         <tbody>
           {classData.seats.map((seat: any) => (
             <tr key={seat.seatNumber}>
-              <td style={{ padding: "4px 0" }}>{seat.seatNumber}</td>
-              <td style={{ padding: "4px 0" }}>
+              <td style={{ padding: "6px 0", borderBottom: "1px solid #2a2a2a" }}>
+                {seat.seatNumber}
+              </td>
+              <td style={{ padding: "6px 0", borderBottom: "1px solid #2a2a2a" }}>
                 {seat.passenger ?? <i style={{ opacity: 0.6 }}>empty</i>}
               </td>
             </tr>
           ))}
-        </tbody>
+      </tbody>
       </table>
 
       {classData.waitlist.length > 0 && (
         <p style={{ marginTop: 8 }}>
-          <b>Waitlist:</b> {classData.waitlist.join(", ")}
-        </p>
+        <b>Waitlist:</b>{" "}
+        {classData.waitlist.length > 0
+          ? classData.waitlist.join(", ")
+          : <i style={{ opacity: 0.6 }}>none</i>}
+</p>
+
       )}
     </div>
   );
@@ -243,7 +249,11 @@ function renderClass(className: string, classData: any) {
 
 
       <section>
-        <h2>Flight 101 info</h2>
+        <h2 style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          Flight 101 info
+          <button onClick={loadFlightInfo}>Refresh</button>
+        </h2>
+
 
         {info && (
           <>
