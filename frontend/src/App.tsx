@@ -107,6 +107,42 @@ export default function App() {
     loadFlightInfo();
   }, []);
 
+
+function renderClass(className: string, classData: any) {
+  return (
+    <div key={className} style={{ marginBottom: 24 }}>
+      <h3>{className.toUpperCase()}</h3>
+
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <thead>
+          <tr>
+            <th style={{ borderBottom: "1px solid #444", textAlign: "left" }}>Seat</th>
+            <th style={{ borderBottom: "1px solid #444", textAlign: "left" }}>Passenger</th>
+          </tr>
+        </thead>
+        <tbody>
+          {classData.seats.map((seat: any) => (
+            <tr key={seat.seatNumber}>
+              <td style={{ padding: "4px 0" }}>{seat.seatNumber}</td>
+              <td style={{ padding: "4px 0" }}>
+                {seat.passenger ?? <i style={{ opacity: 0.6 }}>empty</i>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {classData.waitlist.length > 0 && (
+        <p style={{ marginTop: 8 }}>
+          <b>Waitlist:</b> {classData.waitlist.join(", ")}
+        </p>
+      )}
+    </div>
+  );
+}
+
+
+
   return (
     <div style={{ fontFamily: "system-ui", padding: 16, maxWidth: 900, margin: "0 auto" }}>
       <h1>Flight Scheduler</h1>
@@ -208,9 +244,15 @@ export default function App() {
 
       <section>
         <h2>Flight 101 info</h2>
-        <pre style={{ background: "#f5f5f5", padding: 12, borderRadius: 8, overflowX: "auto" }}>
-          {JSON.stringify(info, null, 2)}
-        </pre>
+
+        {info && (
+          <>
+            {Object.entries(info.classes).map(([className, classData]) =>
+              renderClass(className, classData)
+          )}
+          </>
+        )}
+        
       </section>
     </div>
   );
