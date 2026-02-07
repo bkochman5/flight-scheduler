@@ -289,7 +289,7 @@ if ($path === '/flights/101/info' && $_SERVER['REQUEST_METHOD'] === 'GET') {
             'class' => 'economy',
             'passenger' => $passenger,
         ];
-    }
+}
 
     echo json_encode([
         'flight' => [
