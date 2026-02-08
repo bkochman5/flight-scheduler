@@ -35,6 +35,8 @@ export default function App() {
   const [flights, setFlights] = useState<Flight[]>([]);
   const [info, setInfo] = useState<any>(null);
 
+  const [selectedFlight, setSelectedFlight] = useState<number>(101);
+
   const [bookName, setBookName] = useState("");
   const [bookClass, setBookClass] = useState<"first" | "business" | "economy">("economy");
   const [bookResult, setBookResult] = useState<any>(null);
@@ -61,10 +63,11 @@ export default function App() {
 
   async function loadFlightInfo() {
     setError(null);
-    const res = await fetch(`${API}/flights/101/info`);
+    const res = await fetch(`${API}/flights/${selectedFlight}/info`);
     const data = await res.json();
     setInfo(data);
-  }
+}
+
 
   async function book() {
     setError(null);
@@ -123,11 +126,33 @@ export default function App() {
     setStatusResult(data);
   }
 
+  async function resetDemo() {
+  setError(null);
+
+  const res = await fetch(`${API}/reset`, { method: "POST" });
+  const data = await res.json();
+
+  if (!res.ok) {
+    setError(JSON.stringify(data));
+    return;
+  }
+
+  // reload UI data
+  await loadFlights();
+  await loadFlightInfo();
+
+  // clear UI results
+  setBookResult(null);
+  setCancelResult(null);
+  setStatusResult(null);
+  setStatusError(null);
+}
+
 
   useEffect(() => {
     loadFlights();
     loadFlightInfo();
-  }, []);
+  }, [selectedFlight]);
 
 
 function renderClass(className: string, classData: any) {
@@ -180,6 +205,9 @@ function renderClass(className: string, classData: any) {
   <div style={{ fontFamily: "system-ui", padding: 16, maxWidth: 1100, margin: "0 auto" }}>
     <h1>Flight Scheduler</h1>
     <p>Simple full-stack demo (React + TS frontend, PHP backend).</p>
+    <div style={{ marginBottom: 16, display: "flex", gap: 8 }}>
+    <button onClick={resetDemo}>Reset demo data</button>
+    </div>
 
     {error && (
       <div style={{ padding: 12, background: "#ffe5e5", marginBottom: 12, borderRadius: 8 }}>
@@ -190,6 +218,22 @@ function renderClass(className: string, classData: any) {
     <div style={styles.layout}>
       {/* LEFT COLUMN (actions) */}
       <div style={{...styles.stack, position: "sticky", top: 16 }}>
+
+        <section style={styles.card}>
+          <h2>Selected flight</h2>
+          <select
+            value={selectedFlight}
+            onChange={(e) => setSelectedFlight(Number(e.target.value))}
+          >
+            {flights.map((f) => (
+              <option key={f.flightNumber} value={f.flightNumber}>
+                {f.flightNumber} {f.departureAirport} → {f.arrivalAirport} ({f.departureDate})
+              </option>
+            ))}
+          </select>
+        </section>
+
+
         <section style={styles.card}>
           <h2>Book a seat (Flight 101)</h2>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -289,7 +333,7 @@ function renderClass(className: string, classData: any) {
             </button>
           </h2>
 
-          {info && (
+          {info?.classes && (
             <>
               {Object.entries(info.classes).map(([className, classData]) =>
                 renderClass(className, classData)
