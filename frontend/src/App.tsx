@@ -7,6 +7,28 @@ type Flight = {
   departureDate: string;
 };
 
+const styles = {
+  layout: {
+    display: "grid",
+    gridTemplateColumns: "1fr 1.4fr",
+    gap: 16,
+    alignItems: "start",
+  } as const,
+  card: {
+    background: "#1b1b1b",
+    border: "1px solid #2a2a2a",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  } as const,
+  stack: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 16,
+  } as const,
+};
+
+
 const API = "http://localhost:8001";
 
 export default function App() {
@@ -111,7 +133,12 @@ export default function App() {
 function renderClass(className: string, classData: any) {
   return (
     <div key={className} style={{ marginBottom: 24 }}>
-      <h3>{className.toUpperCase()}</h3>
+      <details open={className !== "economy"} style={{ marginBottom: 12 }}>
+        <summary style={{ cursor: "pointer", fontWeight: 700 }}>
+      {className.toUpperCase()}
+        </summary>
+  
+      
 
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
@@ -133,14 +160,14 @@ function renderClass(className: string, classData: any) {
           ))}
       </tbody>
       </table>
-
+      </details>
       {classData.waitlist.length > 0 && (
         <p style={{ marginTop: 8 }}>
-        <b>Waitlist:</b>{" "}
-        {classData.waitlist.length > 0
-          ? classData.waitlist.join(", ")
-          : <i style={{ opacity: 0.6 }}>none</i>}
-</p>
+          <b>Waitlist:</b>{" "}
+          {classData.waitlist.length > 0
+            ? classData.waitlist.join(", ")
+            : <i style={{ opacity: 0.6 }}>none</i>}
+        </p>
 
       )}
     </div>
@@ -150,120 +177,128 @@ function renderClass(className: string, classData: any) {
 
 
   return (
-    <div style={{ fontFamily: "system-ui", padding: 16, maxWidth: 900, margin: "0 auto" }}>
-      <h1>Flight Scheduler</h1>
-      <p>Simple full-stack demo (React + TS frontend, PHP backend).</p>
+  <div style={{ fontFamily: "system-ui", padding: 16, maxWidth: 1100, margin: "0 auto" }}>
+    <h1>Flight Scheduler</h1>
+    <p>Simple full-stack demo (React + TS frontend, PHP backend).</p>
 
-      {error && (
-        <div style={{ padding: 12, background: "#ffe5e5", marginBottom: 12, borderRadius: 8 }}>
-          <b>Error:</b> <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>{error}</pre>
-        </div>
-      )}
+    {error && (
+      <div style={{ padding: 12, background: "#ffe5e5", marginBottom: 12, borderRadius: 8 }}>
+        <b>Error:</b> <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>{error}</pre>
+      </div>
+    )}
 
-      <section style={{ marginBottom: 24 }}>
-        <h2>Flights</h2>
-        <ul>
-          {flights.map((f) => (
-            <li key={f.flightNumber}>
-              <b>{f.flightNumber}</b> {f.departureAirport} → {f.arrivalAirport} ({f.departureDate})
-            </li>
-          ))}
-        </ul>
-      </section>
+    <div style={styles.layout}>
+      {/* LEFT COLUMN (actions) */}
+      <div style={{...styles.stack, position: "sticky", top: 16 }}>
+        <section style={styles.card}>
+          <h2>Book a seat (Flight 101)</h2>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <input
+              placeholder="Passenger name"
+              value={bookName}
+              onChange={(e) => setBookName(e.target.value)}
+            />
+            <select value={bookClass} onChange={(e) => setBookClass(e.target.value as any)}>
+              <option value="first">first</option>
+              <option value="business">business</option>
+              <option value="economy">economy</option>
+            </select>
+            <button onClick={book} disabled={!bookName.trim()}>
+              Book
+            </button>
+          </div>
 
-      <section style={{ marginBottom: 24 }}>
-        <h2>Book a seat (Flight 101)</h2>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <input
-            placeholder="Passenger name"
-            value={bookName}
-            onChange={(e) => setBookName(e.target.value)}
-          />
-          <select value={bookClass} onChange={(e) => setBookClass(e.target.value as any)}>
-            <option value="first">first</option>
-            <option value="business">business</option>
-            <option value="economy">economy</option>
-          </select>
-          <button onClick={book} disabled={!bookName.trim()}>
-            Book
-          </button>
-        </div>
-        {bookResult && (
-          <pre style={{ background: "#f5f5f5", padding: 12, borderRadius: 8 }}>
-            {JSON.stringify(bookResult, null, 2)}
-          </pre>
-        )}
-      </section>
-
-      <section style={{ marginBottom: 24 }}>
-        <h2>Cancel a booking (Flight 101)</h2>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <input
-            placeholder="Passenger name"
-            value={cancelName}
-            onChange={(e) => setCancelName(e.target.value)}
-          />
-          <select value={cancelClass} onChange={(e) => setCancelClass(e.target.value as any)}>
-            <option value="first">first</option>
-            <option value="business">business</option>
-            <option value="economy">economy</option>
-          </select>
-          <button onClick={cancel} disabled={!cancelName.trim()}>
-            Cancel
-          </button>
-        </div>
-        {cancelResult && (
-          <pre style={{ background: "#f5f5f5", padding: 12, borderRadius: 8 }}>
-            {JSON.stringify(cancelResult, null, 2)}
-          </pre>
-        )}
-      </section>
-
-
-      <section style={{ marginBottom: 24 }}>
-  <h2>Passenger status</h2>
-
-  <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-    <input
-      placeholder="Passenger name"
-      value={statusName}
-      onChange={(e) => setStatusName(e.target.value)}
-    />
-    <button onClick={checkStatus} disabled={!statusName.trim()}>
-      Check
-    </button>
-  </div>
-
-  {statusError && (
-    <pre style={{ background: "#ffe5e5", padding: 12, borderRadius: 8, whiteSpace: "pre-wrap" }}>
-      {statusError}
-    </pre>
-  )}
-
-  {statusResult && (
-    <pre style={{ background: "#f5f5f5", padding: 12, borderRadius: 8 }}>
-      {JSON.stringify(statusResult, null, 2)}
-    </pre>
-  )}
-</section>
-
-
-      <section>
-        <h2 style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          Flight 101 info
-          <button onClick={loadFlightInfo}>Refresh</button>
-        </h2>
-
-
-        {info && (
-          <>
-            {Object.entries(info.classes).map(([className, classData]) =>
-              renderClass(className, classData)
+          {bookResult && (
+            <pre style={{ background: "#f5f5f5", padding: 12, borderRadius: 8 }}>
+              {JSON.stringify(bookResult, null, 2)}
+            </pre>
           )}
-          </>
-        )}
-        
-      </section>
+        </section>
+
+        <section style={styles.card}>
+          <h2>Cancel a booking (Flight 101)</h2>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <input
+              placeholder="Passenger name"
+              value={cancelName}
+              onChange={(e) => setCancelName(e.target.value)}
+            />
+            <select value={cancelClass} onChange={(e) => setCancelClass(e.target.value as any)}>
+              <option value="first">first</option>
+              <option value="business">business</option>
+              <option value="economy">economy</option>
+            </select>
+            <button onClick={cancel} disabled={!cancelName.trim()}>
+              Cancel
+            </button>
+          </div>
+
+          {cancelResult && (
+            <pre style={{ background: "#f5f5f5", padding: 12, borderRadius: 8 }}>
+              {JSON.stringify(cancelResult, null, 2)}
+            </pre>
+          )}
+        </section>
+
+        <section style={styles.card}>
+          <h2>Passenger status</h2>
+
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <input
+              placeholder="Passenger name"
+              value={statusName}
+              onChange={(e) => setStatusName(e.target.value)}
+            />
+            <button onClick={checkStatus} disabled={!statusName.trim()}>
+              Check
+            </button>
+          </div>
+
+          {statusError && (
+            <pre style={{ background: "#ffe5e5", padding: 12, borderRadius: 8, whiteSpace: "pre-wrap" }}>
+              {statusError}
+            </pre>
+          )}
+
+          {statusResult && (
+            <pre style={{ background: "#f5f5f5", padding: 12, borderRadius: 8 }}>
+              {JSON.stringify(statusResult, null, 2)}
+            </pre>
+          )}
+        </section>
+      </div>
+
+      {/* RIGHT COLUMN (data) */}
+      <div style={styles.stack}>
+        <section style={styles.card}>
+          <h2>Flights</h2>
+          <ul>
+            {flights.map((f) => (
+              <li key={f.flightNumber}>
+                <b>{f.flightNumber}</b> {f.departureAirport} → {f.arrivalAirport} ({f.departureDate})
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section style={styles.card}>
+          <h2 style={{ display: "flex", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
+            <span>Flight 101 info</span>
+            <button onClick={loadFlightInfo} style={{ padding: "6px 10px", fontSize: 14 }}>
+                Refresh
+            </button>
+          </h2>
+
+          {info && (
+            <>
+              {Object.entries(info.classes).map(([className, classData]) =>
+                renderClass(className, classData)
+              )}
+            </>
+          )}
+        </section>
+      </div>
     </div>
-  );
+  </div>
+);
 }
